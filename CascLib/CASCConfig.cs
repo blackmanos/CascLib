@@ -508,7 +508,7 @@ namespace CASCLib
 
         public string PatchArchiveGroup => _CDNConfig["patch-archive-group"][0];
 
-        public string FileIndex => _CDNConfig["file-index"][0];
+        public string FileIndex => _CDNConfig["file-index"] != null ? _CDNConfig["file-index"][0] : string.Empty;
 
         public List<KeyValueConfig> Builds => _Builds;
     }

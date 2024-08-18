@@ -19,6 +19,8 @@ namespace CASCLib
         public FileIndexHandler(CASCConfig cascConfig)
         {
             config = cascConfig;
+            if (config.FileIndex == string.Empty)
+                return;
 
             if (config.OnlineMode)
                 DownloadIndexFile(config.FileIndex, 0);

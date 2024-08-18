@@ -114,8 +114,9 @@ namespace CASCLib
 
     public class WowRootHandler : RootHandlerBase
     {
-        private MultiDictionary<int, RootEntry> RootData = new MultiDictionary<int, RootEntry>();
+        public MultiDictionary<int, RootEntry> RootData = new MultiDictionary<int, RootEntry>();
         private Dictionary<int, ulong> FileDataStore = new Dictionary<int, ulong>();
+        private Dictionary<int, string> FileIdToNameStore = new Dictionary<int, string>();
         private Dictionary<ulong, int> FileDataStoreReverse = new Dictionary<ulong, int>();
         private HashSet<ulong> UnknownFiles = new HashSet<ulong>();
 
@@ -346,6 +347,12 @@ namespace CASCLib
             return hash;
         }
 
+        public string GetNameByFileDataId(int fileDataId)
+        {
+            FileIdToNameStore.TryGetValue(fileDataId, out string name);
+            return name;
+        }
+
         public int GetFileDataIdByHash(ulong hash)
         {
             FileDataStoreReverse.TryGetValue(hash, out int fid);
@@ -405,6 +412,7 @@ namespace CASCLib
                         string file = tokens[1];
 
                         ulong fileHash = FileDataStore[fileDataId];
+                        FileIdToNameStore.Add(fileDataId, file);
 
                         if (!CASCFile.Files.ContainsKey(fileHash))
                             CASCFile.Files.Add(fileHash, new CASCFile(fileHash, file));
