@@ -18,10 +18,7 @@ namespace CASCLib
             return hashValue;
         }
 
-        public override void Initialize()
-        {
-
-        }
+        public override void Initialize() { }
 
         protected override unsafe void HashCore(byte[] array, int ibStart, int cbSize)
         {

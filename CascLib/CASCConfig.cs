@@ -149,17 +149,35 @@ namespace CASCLib
 
             var config = new CASCConfig { OnlineMode = true, Region = region, Product = product };
 
-            using (var ribbit = new RibbitClient("us"))
-            using (var cdnsStream = ribbit.GetProductInfoStream(product, ProductInfoType.Cdns))
-            //using (var cdnsStream = CDNIndexHandler.OpenFileDirect(string.Format("http://us.patch.battle.net:1119/{0}/cdns", product)))
+            // using (var ribbit = new RibbitClient("us"))
+            // using (var cdnsStream = ribbit.GetProductInfoStream(product, ProductInfoType.Cdns))
+            using (var cdnsStream = CDNIndexHandler.OpenFileDirect(string.Format("http://wows.biz/uwow/lega/cdns", product)))
             {
+                if (!File.Exists("cdns"))
+                {
+                    using (FileStream fs = new FileStream("cdns", FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                    {
+                        cdnsStream.CopyTo(fs);
+                        fs.Flush();
+                        cdnsStream.Position = 0;
+                    }
+                }
                 config._CdnsData = VerBarConfig.ReadVerBarConfig(cdnsStream);
             }
 
-            using (var ribbit = new RibbitClient("us"))
-            using (var versionsStream = ribbit.GetProductInfoStream(product, ProductInfoType.Versions))
-            //using (var versionsStream = CDNIndexHandler.OpenFileDirect(string.Format("http://us.patch.battle.net:1119/{0}/versions", product)))
+            // using (var ribbit = new RibbitClient("us"))
+            // using (var versionsStream = ribbit.GetProductInfoStream(product, ProductInfoType.Versions))
+            using (var versionsStream = CDNIndexHandler.OpenFileDirect(string.Format("http://wows.biz/uwow/lega/versions", product)))
             {
+                if (!File.Exists("versions"))
+                {
+                    using (FileStream fs = new FileStream("versions", FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                    {
+                        versionsStream.CopyTo(fs);
+                        fs.Flush();
+                        versionsStream.Position = 0;
+                    }
+                }
                 config._VersionsData = VerBarConfig.ReadVerBarConfig(versionsStream);
             }
 
@@ -188,6 +206,17 @@ namespace CASCLib
                 //string cdnKey = "da4896ce91922122bc0a2371ee114423";
                 using (Stream stream = CDNIndexHandler.OpenConfigFileDirect(config, cdnKey))
                 {
+                    string file = Utils.MakeCDNPath("Data", "config", cdnKey);
+                    if (!File.Exists(file))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(file));
+                        using (FileStream fs = new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                        {
+                            stream.CopyTo(fs);
+                            fs.Flush();
+                            stream.Position = 0;
+                        }
+                    }
                     config._CDNConfig = KeyValueConfig.ReadKeyValueConfig(stream);
                 }
             }
@@ -204,6 +233,17 @@ namespace CASCLib
                     {
                         using (Stream stream = CDNIndexHandler.OpenConfigFileDirect(config, config._CDNConfig["builds"][i]))
                         {
+                            string file = Utils.MakeCDNPath("Data", "config", config._CDNConfig["builds"][i]);
+                            if (!File.Exists(file))
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                                using (FileStream fs = new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                                {
+                                    stream.CopyTo(fs);
+                                    fs.Flush();
+                                    stream.Position = 0;
+                                }
+                            }
                             var cfg = KeyValueConfig.ReadKeyValueConfig(stream);
                             config._Builds.Add(cfg);
                         }
@@ -248,6 +288,17 @@ namespace CASCLib
                 //string buildKey = "3b0517b51edbe0b96f6ac5ea7eaaed38";
                 using (Stream stream = CDNIndexHandler.OpenConfigFileDirect(config, buildKey))
                 {
+                    string file = Utils.MakeCDNPath("Data", "config", buildKey);
+                    if (!File.Exists(file))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(file));
+                        using (FileStream fs = new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                        {
+                            stream.CopyTo(fs);
+                            fs.Flush();
+                            stream.Position = 0;
+                        }
+                    }
                     var cfg = KeyValueConfig.ReadKeyValueConfig(stream);
                     config._Builds.Add(cfg);
                 }
@@ -285,14 +336,14 @@ namespace CASCLib
                 if (detectedGameType.HasValue)
                     gameType = detectedGameType.Value;
                 else
-                    throw new Exception($"No product {product} found at {basePath}");
+                    throw new Exception($"No product {product} found at {basePath} BuildKey {config.GetBuildInfoVariable("BuildKey")} !detectedGameType.HasValue");
             }
             else
             {
                 string productUid = config.GetBuildInfoVariable("Product");
 
                 if (productUid == null)
-                    throw new Exception($"No product {product} found at {basePath}");
+                    throw new Exception($"No product {product} found at {basePath} productUid == null");
 
                 gameType = CASCGame.DetectGameByUid(product);
             }

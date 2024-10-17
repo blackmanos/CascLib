@@ -89,7 +89,10 @@ namespace CASCLib
             }
             catch// (Exception exc) when (!(exc is BLTEDecoderException))
             {
-                return OpenFileOnline(tempEKey);
+                Stream stream = OpenFileOnline(tempEKey);
+                stream.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
+                SaveIndex(AppContext.BaseDirectory);
+                return stream;
             }
         }
 
@@ -127,13 +130,50 @@ namespace CASCLib
         {
             Stream stream = GetLocalDataStream(eKey);
 
-            return new BLTEStream(stream, eKey);
+            BLTEStream blte = new BLTEStream(stream, eKey);
+            IndexEntry idxInfo = LocalIndex.GetIndexInfo(eKey);
+            if (idxInfo == null)
+                stream.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
+            return blte;
         }
 
         protected Stream GetLocalDataStream(in MD5Hash eKey)
         {
             IndexEntry idxInfo = LocalIndex.GetIndexInfo(eKey);
             return GetLocalDataStreamInternal(idxInfo, eKey);
+        }
+
+        public bool HasFileInLocal(in MD5Hash eKey)
+        {
+            IndexEntry idxInfo = LocalIndex?.GetIndexInfo(eKey);
+            return idxInfo != null;
+        }
+
+        public void AddFileToData(string path, in MD5Hash eKey)
+        {
+            Console.WriteLine($"AddFileToData path {path} eKey {eKey.ToHexString()}");
+            IndexEntry idxInfo = CDNIndex?.GetIndexInfo(eKey);
+            if (idxInfo != null)
+            {
+                Console.WriteLine($"AddFileToData Index {idxInfo.Index} path {path} eKey {eKey.ToHexString()}");
+                using (Stream s = CDNIndex?.OpenDataFile(idxInfo))
+                {
+                    s.ExtractToData(path, eKey, LocalIndex);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"AddFileToData idxInfo == null path {path} eKey {eKey.ToHexString()}");
+                using (Stream s = CDNIndex?.OpenDataFileDirect(eKey))
+                {
+                    s.ExtractToData(path, eKey, LocalIndex);
+                }
+            }
+        }
+
+        public void SaveIndex(string path)
+        {
+            LocalIndex?.SaveIndex(path);
         }
 
         protected Stream GetLocalDataStreamInternal(IndexEntry idxInfo, in MD5Hash eKey)

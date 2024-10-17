@@ -73,12 +73,12 @@ namespace CASCLib
             int size = (int)_reader.BaseStream.Length;
 
             if (size < 36)
-                throw new BLTEDecoderException(0, "Failed to parse encoding header: not enough data");
+                throw new BLTEDecoderException(0, $"Failed to parse encoding header: not enough data eKey {eKey.ToHexString()}");
 
             int magic = _reader.ReadInt32();
 
             if (magic != BLTE_MAGIC)
-                throw new BLTEDecoderException(0, "Failed to parse encoding header: invalid BLTE header bytes");
+                throw new BLTEDecoderException(0, $"Failed to parse encoding header: invalid BLTE header bytes eKey {eKey.ToHexString()}");
 
             int headerSize = _reader.ReadInt32BE();
             _hasHeader = headerSize > 0;
@@ -92,7 +92,7 @@ namespace CASCLib
                 byte[] newHash = _md5.ComputeHash(_reader.ReadBytes(_hasHeader ? headerSize : size));
 
                 if (!eKey.EqualsTo9(newHash))
-                    throw new BLTEDecoderException(0, $"Failed to parse encoding header: hash verification failed using e-key {eKey.ToHexString()}");
+                    throw new BLTEDecoderException(0, $"Failed to parse encoding header: hash verification failed using eKey {eKey.ToHexString()}");
 
                 _reader.BaseStream.Position = oldPos;
             }

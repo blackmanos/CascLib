@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Linq;
+using System.Security.Cryptography;
 
 namespace CASCLib
 {
@@ -42,6 +44,22 @@ namespace CASCLib
         {
             byte[] val = reader.ReadBytes(4);
             return (uint)(val[3] | val[2] << 8 | val[1] << 16 | val[0] << 24);
+        }
+
+        public static ulong ReadUInt40BE(this BinaryReader reader)
+        {
+            byte[] array = new byte[8];
+            for (int i = 0; i < 5; i++)
+                array[4 - i] = reader.ReadByte();
+
+            return BitConverter.ToUInt64(array, 0);
+        }
+
+        public static void WriteUInt40BE(this BinaryWriter writer, ulong v)
+        {
+            byte[] bytes = BitConverter.GetBytes(v);
+            for (int i = 3; i < bytes.Length; i++)
+                writer.Write(bytes[bytes.Length - i - 1]);
         }
 
         public static Action<T, V> GetSetter<T, V>(this FieldInfo fieldInfo)
@@ -184,6 +202,71 @@ namespace CASCLib
             }
         }
 
+        public static void ExtractToData(this Stream ms, string path, in MD5Hash eKey, LocalIndexHandler LocalIndex)
+        {
+            Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} path {path}");
+
+            byte[] hash = eKey.ToHexString().FromHexString();
+            string filename = GetDataFile(ms.Length + 30, path);
+            Directory.CreateDirectory(path);
+
+            IndexEntry info = new IndexEntry();
+            info.Key = eKey.Take(9).ToArray();
+            info.Index = int.Parse(Path.GetExtension(filename).TrimStart('.'));
+            info.Size = (int)ms.Length;
+
+            var md5 = MD5.Create();
+            byte[] buffer = new byte[ms.Length];
+            ms.Read(buffer, 0, buffer.Length);
+            var hashCheck = md5.ComputeHash(buffer);
+
+            Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} hashCheck {hashCheck.ToHexString()} filename {filename}");
+
+			using (MemoryStream msb = new MemoryStream())
+			using (BinaryWriter bw = new BinaryWriter(msb, Encoding.ASCII))
+            using (FileStream fs = new FileStream(Path.Combine(path, filename), FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            {
+                fs.Seek(0, SeekOrigin.End);
+                info.Offset = (int)fs.Position;
+
+				bw.Write(hash.Reverse().ToArray()); // MD5 hash
+				bw.Write((uint)ms.Length); // Size
+				bw.Write(new byte[0xA]); // Unknown
+
+                ms.Position = 0;
+                msb.CopyTo(fs);
+                ms.CopyTo(fs);
+                fs.Flush();
+            }
+            Console.WriteLine($"ExtractToData LocalIndex hash {hash} hashCheck {hashCheck} filename {filename}");
+            LocalIndex.AddEntry(info);
+        }
+
+		private static string GetDataFile(long bytes, string path)
+		{
+			string pathData = Path.Combine(path, "Data", "data");
+            string prevDataFile = Path.Combine(pathData, "data.000");
+
+            var files = Directory.EnumerateFiles(pathData, "data.*");
+            if (files.Any())
+                prevDataFile = files.OrderByDescending(x => x).First();
+
+            if (!File.Exists(prevDataFile))
+				return prevDataFile;
+
+			long remaining = (0x40000000L - new FileInfo(prevDataFile).Length);
+
+			if (remaining > bytes) // < 1GB space check
+			{
+				return prevDataFile;
+			}
+			else
+			{
+				int ext = int.Parse(Path.GetExtension(prevDataFile).TrimStart('.')) + 1;
+				return Path.Combine(pathData, "data." + ext.ToString("D3")); // make a new .data file
+			}
+		}
+
         public static string ToHexString(this byte[] data)
         {
 #if NET6_0_OR_GREATER
@@ -238,6 +321,11 @@ namespace CASCLib
             return key.lowPart == other.lowPart && key.highPart == other.highPart;
         }
 
+        public static byte[] Take(this in MD5Hash key, int counter)
+        {
+            return key.ToHexString().ToByteArray(counter);
+        }
+
         public static unsafe string ToHexString(this in MD5Hash key)
         {
 #if NET6_0
@@ -274,6 +362,21 @@ namespace CASCLib
 
             return Unsafe.As<byte, MD5Hash>(ref array[0]);
         }
+
+        public static byte[] ToByteArray(this string hex, int count = 32)
+        {
+            Func<char, int> CharToHex = (h) => h - (h < 0x3A ? 0x30 : 0x57);
+
+            count = Math.Min(hex.Length / 2, count);
+
+            var arr = new byte[count];
+            for (var i = 0; i < count; i++)
+                arr[i] = (byte)((CharToHex(hex[i << 1]) << 4) + CharToHex(hex[(i << 1) + 1]));
+
+            return arr;
+        }
+
+        public static string ToMD5String(this byte[] bytes) => BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
     }
 
     public static class CStringExtensions
@@ -326,6 +429,29 @@ namespace CASCLib
 
             return result;
 #endif
+        }
+    }
+
+    class HashComparer : IComparer<byte[]>, IComparer<IndexEntry>, IComparer<MD5Hash>, IComparer<string>
+    {
+        public int Compare(MD5Hash x, MD5Hash y) => Compare(x.ToHexString(), y.ToHexString());
+        public int Compare(IndexEntry x, IndexEntry y) => Compare(x.Key, y.Key);
+        public int Compare(string x, string y) => Compare(x.ToByteArray(), y.ToByteArray());
+
+        public int Compare(byte[] x, byte[] y)
+        {
+            if (x == y)
+                return 0;
+
+            int length = Math.Min(x.Length, y.Length);
+            for (int i = 0; i < length; i++)
+            {
+                int c = x[i].CompareTo(y[i]);
+                if (c != 0)
+                    return c;
+            }
+
+            return 0;
         }
     }
 }

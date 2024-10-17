@@ -14,12 +14,24 @@ namespace CASCLib
         {
             try
             {
+                string dataFolder = CASCGame.GetDataFolder(config.GameType);
                 string file = Utils.MakeCDNPath(config.CDNPath, "data", archive + ".index");
 
                 Stream stream = CDNCache.Instance.OpenFile(file);
 
                 if (stream != null)
                 {
+                    string savePath = Path.Combine("", dataFolder, "indices", archive + ".index");
+                    if (!File.Exists(savePath))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+                        using (FileStream fs = new FileStream(savePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                        {
+                            stream.CopyTo(fs);
+                            fs.Flush();
+                            stream.Position = 0;
+                        }
+                    }
                     using (stream)
                         ParseIndex(stream, dataIndex);
                 }
@@ -28,7 +40,20 @@ namespace CASCLib
                     string url = Utils.MakeCDNUrl(config.CDNHost, file);
 
                     using (var fs = OpenFile(url))
+                    {
+                        string savePath = Path.Combine("", dataFolder, "indices", archive + ".index");
+                        if (!File.Exists(savePath))
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+                            using (FileStream fs2 = new FileStream(savePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                            {
+                                stream.CopyTo(fs2);
+                                fs2.Flush();
+                                stream.Position = 0;
+                            }
+                        }
                         ParseIndex(fs, dataIndex);
+                    }
                 }
             }
             catch (Exception exc)

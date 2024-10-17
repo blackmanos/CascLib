@@ -8,11 +8,44 @@ using System.Net;
 
 namespace CASCLib
 {
+    public class LocalIndexHeader
+    {
+        public string BaseFile;
+        public bool Changed = false;
+
+        public uint HeaderHashSize; // usually 0x10
+        public uint HeaderHash;
+        public ushort _2 = 7;
+        public byte BucketIndex; // always first byte of hex filename
+        public byte _4 = 0;
+        public byte EntrySizeBytes = 4;
+        public byte EntryOffsetBytes = 5;
+        public byte EntryKeyBytes = 9;
+        public byte ArchiveFileHeaderBytes = 30;
+        public ulong ArchiveTotalSizeMaximum = 0x4000000000;
+        public byte[] Padding = new byte[8];
+        public uint EntriesSize; // total entry length in bytes
+        public uint EntriesHash; // jenkins hash of all entries
+
+        public List<IndexEntry> Entries = new List<IndexEntry>();
+    }
+
     public class IndexEntry
     {
+        public byte[] Key; // first 9 bytes of hash
         public int Index;
         public int Offset;
         public int Size;
+
+        public ulong IndexOffset // UInt40 (5 bytes)
+        {
+            get => (ulong)Offset | ((ulong)Index << 30);
+            set
+            {
+                Index = (int)(value >> 30);  // top 10 bits = data.***
+                Offset = (int)(value & 0x3FFFFFFF); // bottom 30 bits = offset
+            }
+        }
     }
 
     public class CDNIndexHandler : IndexHandlerBase
@@ -129,9 +162,13 @@ namespace CASCLib
 
         public Stream OpenDataFile(IndexEntry entry)
         {
+            Console.WriteLine($"OpenDataFile: entry.Index {entry.Index} Archives {config.Archives.Count}");
+
             string archive = config.Archives[entry.Index];
 
             string file = Utils.MakeCDNPath(config.CDNPath, "data", archive);
+
+            Console.WriteLine($"OpenDataFile: archive {archive} file {file}");
 
             MemoryMappedFile dataFile = CDNCache.Instance.OpenDataFile(file);
 
@@ -166,7 +203,7 @@ namespace CASCLib
             catch (WebException exc)
             {
                 var resp = (HttpWebResponse)exc.Response;
-                Logger.WriteLine($"CDNIndexHandler: error while opening {url}: Status {exc.Status}, StatusCode {resp?.StatusCode}");
+                Console.WriteLine($"CDNIndexHandler: error while opening {url}: Status {exc.Status}, StatusCode {resp?.StatusCode}");
                 return null;
             }
         }
@@ -175,7 +212,7 @@ namespace CASCLib
         {
             var keyStr = key.ToHexString().ToLower();
 
-            worker?.ReportProgress(0, string.Format("Downloading \"{0}\" file...", keyStr));
+            Console.WriteLine("Downloading \"{0}\" file...", keyStr);
 
             string file = Utils.MakeCDNPath(config.CDNPath, "data", keyStr);
 
@@ -225,7 +262,7 @@ namespace CASCLib
         public IndexEntry GetIndexInfo(in MD5Hash eKey)
         {
             if (!CDNIndexData.TryGetValue(eKey, out IndexEntry result))
-                Logger.WriteLine("CDNIndexHandler: missing EKey: {0}", eKey.ToHexString());
+                Console.WriteLine("CDNIndexHandler: missing EKey: {0}", eKey.ToHexString());
 
             return result;
         }
