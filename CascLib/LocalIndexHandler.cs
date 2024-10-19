@@ -85,6 +85,8 @@ namespace CASCLib
                     info.IndexOffset = br.ReadUInt40BE();
                     info.Size = br.ReadInt32();
 
+                    // Console.WriteLine($"ParseIndex key {key.ToHexString()} IndexOffset {info.IndexOffset} Size {info.Size}");
+
                     if (!LocalIndexData.ContainsKey(key)) // use first key
                         LocalIndexData.Add(key, info);
 
@@ -99,7 +101,7 @@ namespace CASCLib
 
         public void AddEntry(IndexEntry info)
         {
-            var idx = LocalIndices.First(x => x.BucketIndex == GetBucket(info.Key));
+            var idx = LocalIndices.First(x => x.BucketIndex == info.Key.GetBucket());
             var existing = idx.Entries.FirstOrDefault(x => x.Key.SequenceEqual(info.Key)); // check for existing
 
             if (existing != null)
@@ -107,18 +109,19 @@ namespace CASCLib
             else
                 idx.Entries.Add(info);
 
+            // Console.WriteLine($"AddEntry info.Key {info.Key.ToHexString()} BucketIndex {idx.BucketIndex}");
             idx.Changed = true;
         }
 
         public void SaveIndex(string basePath)
         {
-            Console.WriteLine($"SaveIndex basePath {basePath}");
+            // Console.WriteLine($"SaveIndex basePath {basePath}");
             foreach (var index in LocalIndices)
             {
                 if (!index.Changed)
                     continue;
 
-                Console.WriteLine($"SaveIndex BaseFile {index.BaseFile} BucketIndex {index.BucketIndex}");
+                // Console.WriteLine($"SaveIndex BaseFile {index.BaseFile} BucketIndex {index.BucketIndex}");
 
                 Jenkins96 hasher = new Jenkins96();
 
@@ -146,9 +149,10 @@ namespace CASCLib
                         bw.Write(entry.Key);
                         bw.WriteUInt40BE(entry.IndexOffset);
                         bw.Write(entry.Size);
+                        // Console.WriteLine($"SaveIndex key {entry.Key.ToHexString()} IndexOffset {entry.IndexOffset} Size {entry.Size}");
                     }
 
-                    Console.WriteLine($"SaveIndex Entries {index.Entries.Count}");
+                    // Console.WriteLine($"SaveIndex Entries {index.Entries.Count}");
 
                     // update EntriesHash
                     bw.BaseStream.Position = 0x28;
@@ -156,7 +160,7 @@ namespace CASCLib
                     byte[] entryhash = new byte[18];
                     bw.BaseStream.Read(entryhash, 0, entryhash.Length);
 
-                    Console.WriteLine($"SaveIndex entryhash.Length {entryhash.Length}");
+                    // Console.WriteLine($"SaveIndex entryhash.Length {entryhash.Length}");
 
                     bw.BaseStream.Position = 0x24;
                     bw.Write(hasher.ComputeHash(entryhash));
@@ -166,7 +170,7 @@ namespace CASCLib
                     byte[] headerhash = new byte[index.HeaderHashSize];
                     bw.BaseStream.Read(headerhash, 0, headerhash.Length);
 
-                    Console.WriteLine($"SaveIndex headerhash.Length {headerhash.Length} HeaderHashSize {index.HeaderHashSize}");
+                    // Console.WriteLine($"SaveIndex headerhash.Length {headerhash.Length} HeaderHashSize {index.HeaderHashSize}");
 
                     bw.BaseStream.Position = 4;
                     bw.Write(hasher.ComputeHash(headerhash));
@@ -180,12 +184,13 @@ namespace CASCLib
                     var version = long.Parse(Path.GetFileNameWithoutExtension(index.BaseFile).Substring(2), NumberStyles.HexNumber);
                     string filename = bucket + version.ToString("X8") + ".idx";
 
-                    Console.WriteLine($"SaveIndex bucket {bucket} version {version} filename {filename}");
+                    // Console.WriteLine($"SaveIndex bucket {bucket} version {version} filename {filename}");
 
                     var path = Path.Combine(Path.Combine(basePath, Path.Combine("Data", "data")), filename.ToLowerInvariant());
 
-                    Console.WriteLine($"SaveIndex path {path}");
+                    // Console.WriteLine($"SaveIndex path {path}");
 
+                    File.Delete(path);
                     using (var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read))
                     {
                         fs.Seek(0, SeekOrigin.End);
@@ -199,22 +204,17 @@ namespace CASCLib
             }
         }
 
-        private byte GetBucket(byte[] key)
-        {
-            byte a = key.Aggregate((x, y) => (byte)(x ^ y));
-            return (byte)((a & 0xf) ^ (a >> 4));
-        }
-
         private static List<string> GetIdxFiles(CASCConfig config)
         {
             List<string> latestIdx = new List<string>();
 
             string dataFolder = CASCGame.GetDataFolder(config.GameType);
             string dataPath = Path.Combine(dataFolder, "data");
+            string BasePath = config.BasePath == null ? AppContext.BaseDirectory : config.BasePath;
 
             for (int i = 0; i < 0x10; i++)
             {
-                var files = Directory.EnumerateFiles(Path.Combine(config.BasePath, dataPath), string.Format($"{i:x2}*.idx"));
+                var files = Directory.EnumerateFiles(Path.Combine(BasePath, dataPath), string.Format($"{i:x2}*.idx"));
 
                 if (files.Any())
                     latestIdx.Add(files.Last());

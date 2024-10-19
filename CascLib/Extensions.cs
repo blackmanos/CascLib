@@ -204,7 +204,7 @@ namespace CASCLib
 
         public static void ExtractToData(this Stream ms, string path, in MD5Hash eKey, LocalIndexHandler LocalIndex)
         {
-            Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} path {path}");
+            // Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} path {path}");
 
             byte[] hash = eKey.ToHexString().FromHexString();
             string filename = GetDataFile(ms.Length + 30, path);
@@ -213,14 +213,9 @@ namespace CASCLib
             IndexEntry info = new IndexEntry();
             info.Key = eKey.Take(9).ToArray();
             info.Index = int.Parse(Path.GetExtension(filename).TrimStart('.'));
-            info.Size = (int)ms.Length;
+            info.Size = (int)ms.Length + 30;
 
-            var md5 = MD5.Create();
-            byte[] buffer = new byte[ms.Length];
-            ms.Read(buffer, 0, buffer.Length);
-            var hashCheck = md5.ComputeHash(buffer);
-
-            Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} hashCheck {hashCheck.ToHexString()} filename {filename}");
+            // Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} info.Key {info.Key.ToHexString()} filename {filename}");
 
 			using (MemoryStream msb = new MemoryStream())
 			using (BinaryWriter bw = new BinaryWriter(msb, Encoding.ASCII))
@@ -230,16 +225,18 @@ namespace CASCLib
                 info.Offset = (int)fs.Position;
 
 				bw.Write(hash.Reverse().ToArray()); // MD5 hash
-				bw.Write((uint)ms.Length); // Size
+				bw.Write((uint)ms.Length + 30); // Size
 				bw.Write(new byte[0xA]); // Unknown
 
                 ms.Position = 0;
+                msb.Position = 0;
                 msb.CopyTo(fs);
                 ms.CopyTo(fs);
                 fs.Flush();
             }
-            Console.WriteLine($"ExtractToData LocalIndex hash {hash} hashCheck {hashCheck} filename {filename}");
+            // Console.WriteLine($"ExtractToData LocalIndex hash {hash.ToHexString()} info.Key {info.Key.ToHexString()} filename {filename} Size {info.Size}");
             LocalIndex.AddEntry(info);
+            ms.Position = 0;
         }
 
 		private static string GetDataFile(long bytes, string path)
@@ -323,7 +320,9 @@ namespace CASCLib
 
         public static byte[] Take(this in MD5Hash key, int counter)
         {
-            return key.ToHexString().ToByteArray(counter);
+            var keyBytes = key.ToHexString().FromHexString();
+            Array.Resize(ref keyBytes, counter);
+            return keyBytes;
         }
 
         public static unsafe string ToHexString(this in MD5Hash key)
@@ -353,6 +352,12 @@ namespace CASCLib
                 throw new ArgumentException("array size != 16", nameof(array));
 
             return Unsafe.As<byte, MD5Hash>(ref array[0]);
+        }
+
+        public static byte GetBucket(this byte[] key)
+        {
+            byte a = key.Aggregate((x, y) => (byte)(x ^ y));
+            return (byte)((a & 0xf) ^ (a >> 4));
         }
 
         public static MD5Hash ToMD5(this Span<byte> array)

@@ -34,6 +34,7 @@ namespace CASCLib
         private int _blocksIndex;
         private long _length;
         private bool _hasHeader;
+        private MD5Hash _eKey;
 
         private const byte ENCRYPTION_SALSA20 = 0x53;
         private const byte ENCRYPTION_ARC4 = 0x41;
@@ -70,6 +71,7 @@ namespace CASCLib
 
         private void Parse(in MD5Hash eKey)
         {
+            _eKey = eKey;
             int size = (int)_reader.BaseStream.Length;
 
             if (size < 36)

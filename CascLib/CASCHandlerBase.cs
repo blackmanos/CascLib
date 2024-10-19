@@ -41,9 +41,9 @@ namespace CASCLib
 
             Logger.WriteLine("CASCHandlerBase: loaded {0} CDN indexes", CDNIndex.Count);
 
-            if (!config.OnlineMode)
             {
-                CDNCache.Enabled = false;
+                if (!config.OnlineMode)
+                    CDNCache.Enabled = false;
 
                 Logger.WriteLine("CASCHandlerBase: loading local indices...");
 
@@ -90,7 +90,8 @@ namespace CASCLib
             catch// (Exception exc) when (!(exc is BLTEDecoderException))
             {
                 Stream stream = OpenFileOnline(tempEKey);
-                stream.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
+                if (!HasFileInLocal(tempEKey))
+                    stream.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
                 SaveIndex(AppContext.BaseDirectory);
                 return stream;
             }
@@ -115,6 +116,8 @@ namespace CASCLib
 
             try
             {
+                if (!HasFileInLocal(eKey))
+                    s.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
                 blte = new BLTEStream(s, eKey);
             }
             catch (BLTEDecoderException exc) when (exc.ErrorCode == 0)
@@ -132,8 +135,6 @@ namespace CASCLib
 
             BLTEStream blte = new BLTEStream(stream, eKey);
             IndexEntry idxInfo = LocalIndex.GetIndexInfo(eKey);
-            if (idxInfo == null)
-                stream.ExtractToData(AppContext.BaseDirectory, eKey, LocalIndex);
             return blte;
         }
 
@@ -155,7 +156,6 @@ namespace CASCLib
             IndexEntry idxInfo = CDNIndex?.GetIndexInfo(eKey);
             if (idxInfo != null)
             {
-                Console.WriteLine($"AddFileToData Index {idxInfo.Index} path {path} eKey {eKey.ToHexString()}");
                 using (Stream s = CDNIndex?.OpenDataFile(idxInfo))
                 {
                     s.ExtractToData(path, eKey, LocalIndex);
@@ -163,7 +163,6 @@ namespace CASCLib
             }
             else
             {
-                Console.WriteLine($"AddFileToData idxInfo == null path {path} eKey {eKey.ToHexString()}");
                 using (Stream s = CDNIndex?.OpenDataFileDirect(eKey))
                 {
                     s.ExtractToData(path, eKey, LocalIndex);
@@ -171,9 +170,9 @@ namespace CASCLib
             }
         }
 
-        public void SaveIndex(string path)
+        public void SaveIndex(string basePath)
         {
-            LocalIndex?.SaveIndex(path);
+            LocalIndex.SaveIndex(basePath);
         }
 
         protected Stream GetLocalDataStreamInternal(IndexEntry idxInfo, in MD5Hash eKey)

@@ -162,13 +162,9 @@ namespace CASCLib
 
         public Stream OpenDataFile(IndexEntry entry)
         {
-            Console.WriteLine($"OpenDataFile: entry.Index {entry.Index} Archives {config.Archives.Count}");
-
             string archive = config.Archives[entry.Index];
 
             string file = Utils.MakeCDNPath(config.CDNPath, "data", archive);
-
-            Console.WriteLine($"OpenDataFile: archive {archive} file {file}");
 
             MemoryMappedFile dataFile = CDNCache.Instance.OpenDataFile(file);
 
