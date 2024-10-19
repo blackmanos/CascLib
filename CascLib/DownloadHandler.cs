@@ -1,14 +1,26 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 namespace CASCLib
 {
+	public enum DownloadFlags : byte
+	{
+		None = 0,
+		Plugin = 1,
+		PluginData = 2,
+	}
+
     public class DownloadEntry
     {
         public int Index;
-        //public byte[] Unk;
+        public MD5Hash EKey;
+        public ulong FileSize;
+        public byte Priority;
+		public uint Checksum;
+		public DownloadFlags[] Flags; // V2 only
 
         public IEnumerable<KeyValuePair<string, DownloadTag>> Tags;
     }
@@ -23,6 +35,7 @@ namespace CASCLib
     {
         private Dictionary<MD5Hash, DownloadEntry> DownloadData = new Dictionary<MD5Hash, DownloadEntry>(MD5HashComparer.Instance);
         private Dictionary<string, DownloadTag> Tags = new Dictionary<string, DownloadTag>();
+        private Dictionary<byte, bool> PriorityData = new Dictionary<byte, bool>();
 
         public int Count => DownloadData.Count;
 
@@ -32,27 +45,41 @@ namespace CASCLib
 
             stream.Skip(2); // DL
 
-            byte b1 = stream.ReadByte();
-            byte b2 = stream.ReadByte();
-            byte b3 = stream.ReadByte();
+            byte Version = stream.ReadByte();
+            byte ChecksumSize = stream.ReadByte();
+            byte HasChecksum = stream.ReadByte();
+            byte NumFlags = 0;
 
             int numFiles = stream.ReadInt32BE();
-
             short numTags = stream.ReadInt16BE();
-
             int numMaskBytes = (numFiles + 7) / 8;
+
+            if (Version >= 2)
+                NumFlags = stream.ReadByte();
 
             for (int i = 0; i < numFiles; i++)
             {
-                MD5Hash key = stream.Read<MD5Hash>();
+                var entry = new DownloadEntry()
+                {
+                    Index = i,
+                    EKey = stream.Read<MD5Hash>(),
+                    FileSize = stream.ReadUInt40BE(),
+                    Priority = stream.ReadByte() // 0 (file count 3345), 1 (file count 824864), 2 (file count 679997)
+                };
 
                 //byte[] unk = stream.ReadBytes(0xA);
-                stream.Skip(0xA);
+                // stream.Skip(0xA);
 
-                //var entry = new DownloadEntry() { Index = i, Unk = unk };
-                var entry = new DownloadEntry() { Index = i };
+                if (HasChecksum != 0)
+                    entry.Checksum = stream.ReadUInt32BE();
 
-                DownloadData.Add(key, entry);
+                if (Version >= 2)
+                    entry.Flags = (DownloadFlags[])(object)stream.ReadBytes(NumFlags);
+
+                Logger.WriteLine($"DownloadHandler EKey {entry.EKey.ToHexString()} FileSize {entry.FileSize} Priority {entry.Priority}");
+
+                if (!DownloadData.ContainsKey(entry.EKey))
+                    DownloadData.Add(entry.EKey, entry);
 
                 worker?.ReportProgress((int)((i + 1) / (float)numFiles * 100));
             }

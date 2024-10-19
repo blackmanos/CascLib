@@ -134,7 +134,7 @@ namespace CASCLib
         public static bool ThrowOnMissingDecryptionKey { get; set; } = true;
         public static bool UseWowTVFS { get; set; } = false;
         public static bool UseOnlineFallbackForMissingFiles { get; set; } = true;
-        public static LoadFlags LoadFlags { get; set; } = LoadFlags.FileIndex;
+        public static LoadFlags LoadFlags { get; set; } = LoadFlags.All;
 
         private CASCConfig() { }
 
