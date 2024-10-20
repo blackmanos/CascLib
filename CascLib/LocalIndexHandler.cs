@@ -159,21 +159,23 @@ namespace CASCLib
 
                     byte[] entryhash = new byte[18];
                     bw.BaseStream.Read(entryhash, 0, entryhash.Length);
+                    ulong hashValue = hasher.ComputeHash(entryhash.ToHexString(), true);
 
                     // Console.WriteLine($"SaveIndex entryhash.Length {entryhash.Length}");
 
                     bw.BaseStream.Position = 0x24;
-                    bw.Write(hasher.ComputeHash(entryhash));
+                    bw.Write((uint)(hashValue >> 32) & 0x00000000FFFFFFFF);
 
                     // update HeaderHash
                     bw.BaseStream.Position = 8;
                     byte[] headerhash = new byte[index.HeaderHashSize];
                     bw.BaseStream.Read(headerhash, 0, headerhash.Length);
+                    hashValue = hasher.ComputeHash(headerhash.ToHexString(), true);
 
                     // Console.WriteLine($"SaveIndex headerhash.Length {headerhash.Length} HeaderHashSize {index.HeaderHashSize}");
 
                     bw.BaseStream.Position = 4;
-                    bw.Write(hasher.ComputeHash(headerhash));
+                    bw.Write((uint)(hashValue >> 32) & 0x00000000FFFFFFFF);
 
                     // minimum file length constraint
                     if (bw.BaseStream.Length < CHUNK_SIZE)
