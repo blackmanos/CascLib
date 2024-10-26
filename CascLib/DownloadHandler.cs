@@ -33,7 +33,7 @@ namespace CASCLib
 
     public class DownloadHandler
     {
-        private Dictionary<MD5Hash, DownloadEntry> DownloadData = new Dictionary<MD5Hash, DownloadEntry>(MD5HashComparer.Instance);
+        public Dictionary<MD5Hash, DownloadEntry> DownloadData = new Dictionary<MD5Hash, DownloadEntry>(MD5HashComparer.Instance);
         private Dictionary<string, DownloadTag> Tags = new Dictionary<string, DownloadTag>();
         private Dictionary<byte, bool> PriorityData = new Dictionary<byte, bool>();
 
@@ -76,7 +76,7 @@ namespace CASCLib
                 if (Version >= 2)
                     entry.Flags = (DownloadFlags[])(object)stream.ReadBytes(NumFlags);
 
-                Logger.WriteLine($"DownloadHandler EKey {entry.EKey.ToHexString()} FileSize {entry.FileSize} Priority {entry.Priority}");
+                // Logger.WriteLine($"DownloadHandler EKey {entry.EKey.ToHexString()} FileSize {entry.FileSize} Priority {entry.Priority}");
 
                 if (!DownloadData.ContainsKey(entry.EKey))
                     DownloadData.Add(entry.EKey, entry);

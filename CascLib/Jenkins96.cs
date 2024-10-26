@@ -20,6 +20,11 @@ namespace CASCLib
 
         public override void Initialize() { }
 
+        public void HashCore(byte[] array)
+        {
+            HashCore(array, 0, 0);
+        }
+
         protected override unsafe void HashCore(byte[] array, int ibStart, int cbSize)
         {
             static uint Rot(uint x, int k) => (x << k) | (x >> (32 - k));
@@ -81,6 +86,11 @@ namespace CASCLib
         protected override byte[] HashFinal()
         {
             return hashBytes;
+        }
+
+        public ulong GetHashValue()
+        {
+            return hashValue;
         }
     }
 }

@@ -8,12 +8,38 @@ using System.Net;
 
 namespace CASCLib
 {
+    public class ShmemHeader
+    {
+        public bool Changed = false;
+
+        public uint BlockType = 4; // A value indicating what type of block this is. For this block, the value is either 4 or 5.
+        public uint NextBlock; // The offset of the next block.
+        public char[] DataPath = new char[0x100]; // The path to the data files. It is always prefixed with "Global\". The path uses forward slashes (except the prefix).
+
+        public List<ShmemEntry> Entries = new List<ShmemEntry>();
+    }
+
+    public class ShmemEntry
+    {
+        public bool Changed = false;
+
+        public uint Size; // The size of the block.
+        public uint Offset; // The offset of the block.
+    }
+
+    public class LocalIndexSpace
+    {
+        public int Archive;
+        public int Offset;
+        public int Size;
+    }
+
     public class LocalIndexHeader
     {
         public string BaseFile;
         public bool Changed = false;
 
-        public uint HeaderHashSize; // usually 0x10
+        public uint HeaderHashSize = 0x10; // usually 0x10
         public uint HeaderHash;
         public ushort _2 = 7;
         public byte BucketIndex; // always first byte of hex filename
