@@ -7,7 +7,9 @@ namespace CASCLib
     // Implementation of Bob Jenkins' hash function in C# (96 bit internal state)
     public class Jenkins96 : HashAlgorithm
     {
-        private ulong hashValue;
+        public uint pC = 0;
+        public uint pB;
+        private ulong hashValue = 0;
         private static byte[] hashBytes = new byte[0];
 
         public ulong ComputeHash(string str, bool fix = true)
@@ -20,9 +22,13 @@ namespace CASCLib
 
         public override void Initialize() { }
 
-        public void HashCore(byte[] array)
+        public void HashCore(byte[] array, out uint pC, bool reset = false)
         {
+            if (reset)
+                pC = pB = 0;
+
             HashCore(array, 0, 0);
+            pC = this.pC;
         }
 
         protected override unsafe void HashCore(byte[] array, int ibStart, int cbSize)
@@ -30,9 +36,10 @@ namespace CASCLib
             static uint Rot(uint x, int k) => (x << k) | (x >> (32 - k));
 
             uint length = (uint)array.Length;
-            uint a = 0xdeadbeef + length;
+            uint a = 0xdeadbeef + length + pC;
             uint b = a;
             uint c = a;
+            c += pB;
 
             if (length == 0)
             {
@@ -78,6 +85,9 @@ namespace CASCLib
                 a ^= c; a -= Rot(c, 4);
                 b ^= a; b -= Rot(a, 14);
                 c ^= b; c -= Rot(b, 24);
+
+                pB = b;
+                pC = c;
 
                 hashValue = ((ulong)c << 32) | b;
             }

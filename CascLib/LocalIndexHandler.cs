@@ -53,6 +53,13 @@ namespace CASCLib
 
             byte idxFileCount = 16;
 
+            if (!File.Exists(fileShmem))
+            {
+                for (byte i = 0; i < idxFileCount; i++)
+                    BucketIndexVersion.Add(i, 1);
+                return;
+            }
+
             using (var fs = new FileStream(fileShmem, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var br = new BinaryReader(fs))
             {
@@ -152,28 +159,17 @@ namespace CASCLib
                 Console.WriteLine($"ParseIndex HeaderHash {index.HeaderHash} BucketIndex {index.BucketIndex} EntriesSize {index.EntriesSize} EntriesHash {index.EntriesHash}");
                 // Console.WriteLine($"ParseIndex EntrySizeBytes {index.EntrySizeBytes} EntryOffsetBytes {index.EntryOffsetBytes} EntryKeyBytes {index.EntryKeyBytes} ArchiveFileHeaderBytes {index.ArchiveFileHeaderBytes} ArchiveTotalSizeMaximum {index.ArchiveTotalSizeMaximum}");
 
-                Jenkins96 hasher = new Jenkins96();
-                br.BaseStream.Position = 0x28;
-                byte[] entryhash = br.ReadBytes((int)index.EntriesSize);
-                hasher.HashCore(entryhash);
-                ulong hashValue = hasher.GetHashValue();
-
-                Console.WriteLine($"ParseIndex entryhash new {(uint)(hashValue >> 32) & 0x00000000FFFFFFFF} {(uint)hashValue & 0x00000000FFFFFFFF} EntriesHash old {index.EntriesHash} entryhash.Length {entryhash.Length}");
-
                 // test generation HeaderHash
-                br.BaseStream.Position = 8;
-                byte[] h2 = br.ReadBytes((int)index.HeaderHashSize);
-                hasher.HashCore(h2);
-                hashValue = hasher.GetHashValue();
-
-                Console.WriteLine($"ParseIndex headerhash cheack {(uint)(hashValue >> 32) & 0x00000000FFFFFFFF} HeaderHash read {index.HeaderHash}");
-
+                // uint pC = 0;
+                // Jenkins96 hasher1 = new Jenkins96();
+                // Jenkins96 hasher2 = new Jenkins96();
                 uint numBlocks = index.EntriesSize / 18;
 
                 // entries
                 br.BaseStream.Position = 0x28;
                 for (uint i = 0; i < numBlocks; i++)
                 {
+                    // var startPos = br.BaseStream.Position;
                     IndexEntry info = new IndexEntry();
                     byte[] keyBytes = br.ReadBytes(9);
                     info.Key = keyBytes;
@@ -186,11 +182,23 @@ namespace CASCLib
 
                     // Logger.WriteLine($"ParseIndex key {info.Key.ToHexString()} Index {info.Index} Offset {info.Offset} Size {info.Size}");
 
+                    // br.BaseStream.Position = startPos;
+                    // byte[] entryhash = br.ReadBytes(18);
+                    // hasher1.HashCore(entryhash, out pC);
+
                     if (!LocalIndexData.ContainsKey(key)) // use first key
                         LocalIndexData.Add(key, info);
 
                     index.Entries.Add(info);
                 }
+
+                // Console.WriteLine($"ParseIndex entryhash pC {pC} EntriesHash old {index.EntriesHash}");
+
+                // br.BaseStream.Position = 8;
+                // byte[] h2 = br.ReadBytes((int)index.HeaderHashSize);
+                // hasher2.HashCore(h2, out pC);
+
+                // Console.WriteLine($"ParseIndex headerhash pC {pC} HeaderHash read {index.HeaderHash}");
 
                 LocalIndices.Add(index);
                 //if (fs.Position != fs.Length)
@@ -200,7 +208,6 @@ namespace CASCLib
 
         public void AddEntry(IndexEntry info)
         {
-            return;
             var idx = LocalIndices.First(x => x.BucketIndex == info.Key.GetBucket());
             var existing = idx.Entries.FirstOrDefault(x => x.Key.SequenceEqual(info.Key)); // check for existing
 
@@ -209,7 +216,7 @@ namespace CASCLib
             else
                 idx.Entries.Add(info);
 
-            // Console.WriteLine($"AddEntry info.Key {info.Key.ToHexString()} BucketIndex {idx.BucketIndex}");
+            Console.WriteLine($"AddEntry info.Key {info.Key.ToHexString()} BucketIndex {idx.BucketIndex}");
             idx.Changed = true;
             LocalShmems.Changed = true;
         }
@@ -222,12 +229,14 @@ namespace CASCLib
             // Console.WriteLine($"SaveIndex basePath {basePath}");
             foreach (var index in LocalIndices)
             {
-                // if (!index.Changed)
-                    // continue;
+                if (!index.Changed)
+                    continue;
 
-                // Console.WriteLine($"SaveIndex BaseFile {index.BaseFile} BucketIndex {index.BucketIndex}");
+                Console.WriteLine($"SaveIndex BaseFile {index.BaseFile} BucketIndex {index.BucketIndex} Changed {index.Changed}");
 
-                Jenkins96 hasher = new Jenkins96();
+                uint pC = 0;
+                Jenkins96 hasher1 = new Jenkins96();
+                Jenkins96 hasher2 = new Jenkins96();
 
                 using (var ms = new MemoryStream())
                 using (var bw = new BinaryWriter(ms))
@@ -250,39 +259,37 @@ namespace CASCLib
                     index.Entries.Sort(new HashComparer());
                     foreach (var entry in index.Entries)
                     {
+                        var startPos = bw.BaseStream.Position;
                         bw.Write(entry.Key);
                         bw.WriteUInt40BE(entry.IndexOffset);
                         bw.Write(entry.Size);
+
+                        bw.BaseStream.Position = startPos;
+                        byte[] entryhash = new byte[18];
+                        bw.BaseStream.Read(entryhash, 0, entryhash.Length);
+                        hasher1.HashCore(entryhash, out pC);
                         // Console.WriteLine($"SaveIndex key {entry.Key.ToHexString()} IndexOffset {entry.IndexOffset} Size {entry.Size}");
+                        bw.BaseStream.Position = startPos + 18;
                     }
 
-                    // update EntriesHash
-                    bw.BaseStream.Position = 0x28;
-
-                    byte[] entryhash = new byte[18];
-                    bw.BaseStream.Read(entryhash, 0, entryhash.Length);
-                    hasher.HashCore(entryhash);
-                    ulong hashValue = hasher.GetHashValue();
-
-                    Console.WriteLine($"SaveIndex entryhash new {(uint)(hashValue >> 32) & 0x00000000FFFFFFFF} EntriesHash old {index.EntriesHash}");
+                    Console.WriteLine($"SaveIndex entryhash pC {pC} EntriesHash old {index.EntriesHash}");
 
                     bw.BaseStream.Position = 0x24;
                     if (index.Entries.Count == 0)
                         bw.Write((uint)0);
                     else
-                        bw.Write((uint)(hashValue >> 32) & 0x00000000FFFFFFFF);
+                        bw.Write(pC);
 
                     // update HeaderHash
                     bw.BaseStream.Position = 8;
                     byte[] headerhash = new byte[index.HeaderHashSize];
                     bw.BaseStream.Read(headerhash, 0, headerhash.Length);
-                    hasher.HashCore(headerhash);
-                    hashValue = hasher.GetHashValue();
+                    hasher2.HashCore(headerhash, out pC, true);
 
-                    Console.WriteLine($"SaveIndex headerhash new {(uint)(hashValue >> 32) & 0x00000000FFFFFFFF} HeaderHash old {index.HeaderHash}");
+                    Console.WriteLine($"SaveIndex headerhash new {pC} HeaderHash old {index.HeaderHash}");
 
                     bw.BaseStream.Position = 4;
-                    bw.Write((uint)(hashValue >> 32) & 0x00000000FFFFFFFF);
+                    bw.Write(pC);
 
                     // minimum file length constraint
                     var Length = (Convert.ToInt32((float)bw.BaseStream.Length / (float)0x10000) + 1) * 0x10000;
@@ -320,7 +327,7 @@ namespace CASCLib
             if (!LocalShmems.Changed)
                 return;
 
-            Console.WriteLine($"SaveShmem BlockType {LocalShmems.BlockType} NextBlock {LocalShmems.NextBlock}");
+            Console.WriteLine($"SaveShmem BlockType {LocalShmems.BlockType} NextBlock {LocalShmems.NextBlock} Changed {LocalShmems.Changed}");
 
             using (var ms = new MemoryStream())
             using (var bw = new BinaryWriter(ms))
