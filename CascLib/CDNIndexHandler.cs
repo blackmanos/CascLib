@@ -13,7 +13,7 @@ namespace CASCLib
         public bool Changed = false;
 
         public uint BlockType = 4; // A value indicating what type of block this is. For this block, the value is either 4 or 5.
-        public uint NextBlock; // The offset of the next block.
+        public uint NextBlock = 336; // The offset of the next block.
         public char[] DataPath = new char[0x100]; // The path to the data files. It is always prefixed with "Global\". The path uses forward slashes (except the prefix).
 
         public List<ShmemEntry> Entries = new List<ShmemEntry>();

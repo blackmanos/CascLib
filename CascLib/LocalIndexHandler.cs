@@ -57,6 +57,10 @@ namespace CASCLib
             {
                 for (byte i = 0; i < idxFileCount; i++)
                     BucketIndexVersion.Add(i, 1);
+                string str = "Global\\data/data";
+                LocalShmems.DataPath = str.ToCharArray();
+                Array.Resize(ref LocalShmems.DataPath, 0x100);
+                LocalShmems.Changed = true;
                 return;
             }
 
