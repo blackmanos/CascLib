@@ -239,6 +239,34 @@ namespace CASCLib
             ms.Position = 0;
         }
 
+        public static void RestoreToData(this Stream ms, string filename, in MD5Hash eKey, IndexEntry info)
+        {
+            // Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} filename {filename}");
+
+            byte[] hash = eKey.ToHexString().FromHexString();
+
+            // Console.WriteLine($"ExtractToData eKey {eKey.ToHexString()} info.Key {info.Key.ToHexString()} filename {filename}");
+
+			using (MemoryStream msb = new MemoryStream())
+			using (BinaryWriter bw = new BinaryWriter(msb, Encoding.ASCII))
+            using (FileStream fs = new FileStream(filename, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            {
+                fs.Position = info.Offset;
+
+				bw.Write(hash.Reverse().ToArray()); // MD5 hash
+				bw.Write((uint)ms.Length + 30); // Size
+				bw.Write(new byte[0xA]); // Unknown
+
+                ms.Position = 0;
+                msb.Position = 0;
+                msb.CopyTo(fs);
+                ms.CopyTo(fs);
+                fs.Flush();
+            }
+            // Console.WriteLine($"ExtractToData LocalIndex hash {hash.ToHexString()} info.Key {info.Key.ToHexString()} filename {filename} Size {info.Size}");
+            ms.Position = 0;
+        }
+
 		private static string GetDataFile(long bytes, string path)
 		{
 			string pathData = Path.Combine(path, "Data", "data");

@@ -170,9 +170,34 @@ namespace CASCLib
             }
         }
 
+        public void RestoreToData(string filename, in MD5Hash eKey, IndexEntry info)
+        {
+            Console.WriteLine($"RestoreToData filename {filename} eKey {eKey.ToHexString()}");
+            IndexEntry idxInfo = CDNIndex?.GetIndexInfo(eKey);
+            if (idxInfo != null)
+            {
+                using (Stream s = CDNIndex?.OpenDataFile(idxInfo))
+                {
+                    s.RestoreToData(filename, eKey, info);
+                }
+            }
+            else
+            {
+                using (Stream s = CDNIndex?.OpenDataFileDirect(eKey))
+                {
+                    s.RestoreToData(filename, eKey, info);
+                }
+            }
+        }
+
         public void SaveIndex(string basePath)
         {
             LocalIndex.SaveIndex(basePath);
+        }
+
+        public void AddEntry(IndexEntry info)
+        {
+            LocalIndex.AddEntry(info);
         }
 
         protected Stream GetLocalDataStreamInternal(IndexEntry idxInfo, in MD5Hash eKey)

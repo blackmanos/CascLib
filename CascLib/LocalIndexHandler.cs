@@ -220,7 +220,7 @@ namespace CASCLib
             else
                 idx.Entries.Add(info);
 
-            Console.WriteLine($"AddEntry info.Key {info.Key.ToHexString()} BucketIndex {idx.BucketIndex}");
+            // Console.WriteLine($"AddEntry info.Key {info.Key.ToHexString()} BucketIndex {idx.BucketIndex}");
             idx.Changed = true;
             LocalShmems.Changed = true;
         }
